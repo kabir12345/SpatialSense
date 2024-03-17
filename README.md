@@ -1,1 +1,1 @@
-# SpatialSense-Recognize-Segment-Depth-Navigation-Aid
+# SpatialSense: Recognize, Segment, Depth Navigation Aid
