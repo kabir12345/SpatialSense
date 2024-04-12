@@ -15,7 +15,8 @@ from io import BytesIO
 import yaml
 import psutil
 import threading
-
+from ZoeDepth.zoedepth.models.builder import build_model
+from ZoeDepth.zoedepth.utils.config import get_config
 
 def main():
     st.title('SpatialSense')
@@ -36,15 +37,8 @@ def main():
     st.write("Depth Anything Model Running Locally in Near Real-Time")
     placeholder = st.empty()
     text_placeholder = st.empty()
-    # user_query = st.text_input("Ask me anything about the current image:", "")
-
-    # if st.button("Submit"):
-    #     handle_user_query(user_query, temp_image_path, text_placeholder)
-    # Initialize the depth-estimation pipeline
+  
     pipe = pipeline(task="depth-estimation", model="LiheYoung/depth-anything-small-hf")
-
-    # Initialize Ollama client (placeholder)
-    # client = Client(host='http://localhost:11434')
 
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')
@@ -52,7 +46,7 @@ def main():
     options.add_argument('--no-sandbox')
     driver = webdriver.Chrome(options=options)
 
-    driver.get('http://localhost:8501/')
+    driver.get('http://localhost:8502/')
 
     frame_rate = 1
     wait_time = 1 / frame_rate
@@ -128,8 +122,18 @@ def apply_depth_estimation(pipe, pil_img):
 
 def encode_image_to_base64(pil_img):
     buffered = BytesIO()
-    pil_img.save(buffered, format="JPEG")  # You can change to "PNG" if you prefer
+    pil_img.save(buffered, format="JPEG")  
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+def calculate_zoedepth(image_path):
+        config = get_config("/Users/kabir/Downloads/SpatialSense/ZoeDepth/configs/zoe.yaml")
+        model = build_model(config)
+        model.load_state_dict(torch.load("/Users/kabir/Downloads/SpatialSense/ZoeDepth/checkpoints/zoe.pth"))
+        model.eval()
+        image = Image.open(image_path)
+        depth_map = Zoe(model, image)
+        zoedepth = np.mean(depth_map)
+        return zoedepth
 
 def handle_user_query(query, image_path, text_placeholder):
     if query:
@@ -138,12 +142,11 @@ def handle_user_query(query, image_path, text_placeholder):
             {
                 'role': 'user',
                 'content': query,
-                'images': [image_path]  # Pass the path to the temporary file
+                'images': [image_path] 
             },
         ])
-        # Assuming response returns correctly, extract the response content if necessary
-        response_content = str(response['message']['content'])  # Adjust based on how the response content is structured
-        text_placeholder.text(response_content)
+        
+        response_content = str(response['message']['content'])  
 
 def update_cpu_usage():
     while True:
@@ -154,3 +157,4 @@ def update_cpu_usage():
 
 if __name__ == "__main__":
     main()
+
