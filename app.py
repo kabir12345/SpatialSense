@@ -1,24 +1,12 @@
 import streamlit as st
-from streamlit.components.v1 import html
-import cv2
-import numpy as np
+from streamlit_webrtc import WebRtcMode, webrtc_streamer, VideoTransformerBase
+import av
 from PIL import Image
-import io
-import time
-from selenium import webdriver
+import numpy as np
+import cv2
 from transformers import pipeline
 import torch
 import torch.nn.functional as F
-from ollama import Client
-import base64
-from io import BytesIO
-import yaml
-import psutil
-import threading
-from streamlit_webrtc import WebRtcMode, webrtc_streamer
-import av
-
-OPENCV_AVFOUNDATION_SKIP_AUTH=1
 
 def main():
     st.title('SpatialSense')
@@ -27,7 +15,7 @@ def main():
     # Initialize the depth-estimation pipeline
     pipe = pipeline(task="depth-estimation", model="LiheYoung/depth-anything-small-hf")
 
-    class VideoTransformer:
+    class VideoTransformer(VideoTransformerBase):
         def __init__(self):
             self.pipe = pipe
 
@@ -40,15 +28,16 @@ def main():
 
             # Convert PIL Image to NumPy array for display in Streamlit
             depth_mask_np = np.array(depth_mask)
-            return av.VideoFrame.from_ndarray(depth_mask_np, format="bgr24")
+
+            # Concatenate original image and depth mask side by side
+            combined_frame = np.concatenate((image, depth_mask_np), axis=1)
+
+            return av.VideoFrame.from_ndarray(combined_frame, format="bgr24")
 
     # Streamlit-WebRTC component
     webrtc_ctx = webrtc_streamer(key="example",
                                  mode=WebRtcMode.SENDRECV,
                                  video_frame_callback=VideoTransformer().transform)
-
-
-
 
 def apply_depth_estimation(pipe, pil_img):
     # Assume the rest of your depth estimation logic is defined here
@@ -64,32 +53,6 @@ def apply_depth_estimation(pipe, pil_img):
     colored_depth_image = Image.fromarray(colored_depth_rgb)
     
     return colored_depth_image
-
-def encode_image_to_base64(pil_img):
-    buffered = BytesIO()
-    pil_img.save(buffered, format="JPEG")  # You can change to "PNG" if you prefer
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
-
-def handle_user_query(query, image_path, text_placeholder):
-    if query:
-        client = Client(host='http://localhost:11434')
-        response = client.chat(model='llava:7b-v1.5-q2_K', messages=[
-            {
-                'role': 'user',
-                'content': query,
-                'images': [image_path]  # Pass the path to the temporary file
-            },
-        ])
-        # Assuming response returns correctly, extract the response content if necessary
-        response_content = str(response['message']['content'])  # Adjust based on how the response content is structured
-        text_placeholder.text(response_content)
-
-def update_cpu_usage():
-    while True:
-        cpu_usage = psutil.cpu_percent(interval=1)
-        st.session_state.cpu_usage = f"CPU Usage: {cpu_usage}%"
-        time.sleep(5)  # Update every 5 seconds, adjust as needed
-
 
 if __name__ == "__main__":
     main()
